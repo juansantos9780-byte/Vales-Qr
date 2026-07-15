@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registro de Vales QR</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root{
+    --bg:#0f172a; --card:#1e293b; --accent:#22c55e; --accent-dark:#16a34a;
+    --text:#f1f5f9; --muted:#94a3b8; --danger:#ef4444; --border:#334155;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    background:var(--bg); color:var(--text); min-height:100vh;
+  }
+  .wrap{max-width:480px; margin:0 auto; padding:16px;}
+  h1{font-size:1.25rem; text-align:center; margin:8px 0 16px;}
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:14px;
+    padding:16px; margin-bottom:16px;
+  }
+  #reader{width:100%; border-radius:10px; overflow:hidden;}
+  label{display:block; font-size:.85rem; color:var(--muted); margin:10px 0 4px;}
+  input, select{
+    width:100%; padding:12px; border-radius:8px; border:1px solid var(--border);
+    background:#0b1220; color:var(--text); font-size:1rem;
+  }
+  input:read-only{ opacity:.75; }
+  button{
+    width:100%; padding:14px; border:none; border-radius:10px; font-size:1rem;
+    font-weight:600; cursor:pointer; margin-top:14px;
+  }
+  .btn-primary{background:var(--accent); color:#052e12;}
+  .btn-primary:active{background:var(--accent-dark);}
+  .btn-secondary{background:transparent; color:var(--text); border:1px solid var(--border);}
+  .status{font-size:.9rem; text-align:center; margin-top:10px; min-height:1.2em;}
+  .status.ok{color:var(--accent);}
+  .status.err{color:var(--danger);}
+  .badge{
+    display:inline-block; font-size:.75rem; background:#0b1220; border:1px solid var(--border);
+    color:var(--muted); padding:4px 8px; border-radius:999px; margin-bottom:8px;
+  }
+  a.link{color:var(--accent); text-decoration:none; font-size:.85rem;}
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Registro de Vales QR</h1>
+
+  <div class="card" id="scanCard">
+    <span class="badge">Paso 1 · Escaneá el QR de la persona</span>
+    <div id="reader"></div>
+    <button class="btn-secondary" id="restartBtn">Reiniciar cámara</button>
+  </div>
+
+  <div class="card hidden" id="formCard">
+    <span class="badge">Paso 2 · Completá los datos del viaje</span>
+
+    <label>Nombre</label>
+    <input id="nombre" type="text" placeholder="Nombre y apellido">
+
+    <label>Empresa</label>
+    <input id="empresa" type="text" placeholder="Empresa">
+
+    <label>Fecha y hora</label>
+    <input id="fecha" type="datetime-local">
+
+    <label>Dirección donde se encontraba (origen)</label>
+    <input id="origen" type="text" placeholder="Ej: Av. Siempre Viva 123">
+
+    <label>Dirección a la que se dirige (destino)</label>
+    <input id="destino" type="text" placeholder="Ej: Ruta 8 km 45">
+
+    <button class="btn-primary" id="submitBtn">Guardar registro</button>
+    <button class="btn-secondary" id="cancelBtn">Cancelar / Escanear otro</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <p style="text-align:center;">
+    <a class="link" href="generar-qr.html">Generar códigos QR de personas →</a>
+  </p>
+</div>
+
+<script>
+// Pegá acá la URL de tu implementación de Google Apps Script (termina en /exec)
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyd0n8mwJiUxNYxI9adQy3c_pfIk6MPZla7yG84kr4GIQ_-zirAE7cNmG0RrHB4CTg/exec";
+
+const scanCard = document.getElementById('scanCard');
+const formCard = document.getElementById('formCard');
+const statusEl = document.getElementById('status');
+
+const nombreEl = document.getElementById('nombre');
+const empresaEl = document.getElementById('empresa');
+const fechaEl = document.getElementById('fecha');
+const origenEl = document.getElementById('origen');
+const destinoEl = document.getElementById('destino');
+
+let html5QrCode;
+
+function localDateTimeNow() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0,16);
+}
+
+function startScanner() {
+  scanCard.classList.remove('hidden');
+  formCard.classList.add('hidden');
+  statusEl.textContent = '';
+  html5QrCode = new Html5Qrcode("reader");
+  const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+  html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
+    .catch(err => {
+      statusEl.textContent = "No se pudo acceder a la cámara: " + err;
+      statusEl.className = "status err";
+    });
+}
+
+function stopScanner() {
+  if (html5QrCode) {
+    // stop() puede lanzar de forma síncrona (no como promesa) si la cámara
+    // nunca llegó a iniciar (permiso denegado, sin cámara, etc.)
+    try {
+      return html5QrCode.stop().catch(() => {});
+    } catch (e) {
+      return Promise.resolve();
+    }
+  }
+  return Promise.resolve();
+}
+
+function onScanSuccess(decodedText) {
+  stopScanner().then(() => {
+    let data = {};
+    try {
+      data = JSON.parse(decodedText);
+    } catch (e) {
+      data = { nombre: decodedText, empresa: "" };
+    }
+    nombreEl.value = data.nombre || "";
+    empresaEl.value = data.empresa || "";
+    fechaEl.value = localDateTimeNow();
+    origenEl.value = "";
+    destinoEl.value = "";
+
+    scanCard.classList.add('hidden');
+    formCard.classList.remove('hidden');
+  });
+}
+
+document.getElementById('restartBtn').addEventListener('click', () => {
+  stopScanner().then(startScanner);
+});
+
+document.getElementById('cancelBtn').addEventListener('click', () => {
+  startScanner();
+});
+
+document.getElementById('submitBtn').addEventListener('click', async () => {
+  if (!nombreEl.value.trim() || !empresaEl.value.trim() || !fechaEl.value ||
+      !origenEl.value.trim() || !destinoEl.value.trim()) {
+    statusEl.textContent = "Completá todos los campos.";
+    statusEl.className = "status err";
+    return;
+  }
+  if (APPS_SCRIPT_URL.includes("PEGA_AQUI")) {
+    statusEl.textContent = "Falta configurar la URL de Apps Script en index.html.";
+    statusEl.className = "status err";
+    return;
+  }
+
+  const payload = {
+    nombre: nombreEl.value.trim(),
+    empresa: empresaEl.value.trim(),
+    fecha: fechaEl.value.replace('T', ' '),
+    origen: origenEl.value.trim(),
+    destino: destinoEl.value.trim()
+  };
+
+  statusEl.textContent = "Guardando...";
+  statusEl.className = "status";
+
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload)
+    });
+    const result = await res.json();
+    if (result.ok) {
+      statusEl.textContent = "Registro guardado correctamente ✔";
+      statusEl.className = "status ok";
+      setTimeout(startScanner, 1200);
+    } else {
+      statusEl.textContent = "Error: " + (result.error || "desconocido");
+      statusEl.className = "status err";
+    }
+  } catch (e) {
+    statusEl.textContent = "Error de conexión: " + e.message;
+    statusEl.className = "status err";
+  }
+});
+
+startScanner();
+</script>
+</body>
+</html>

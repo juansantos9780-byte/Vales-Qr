@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Generador de QR - Personas</title>
+<script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js"></script>
+<style>
+  :root{
+    --bg:#0f172a; --card:#1e293b; --accent:#22c55e; --accent-dark:#16a34a;
+    --text:#f1f5f9; --muted:#94a3b8; --border:#334155;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text);}
+  .wrap{max-width:640px; margin:0 auto; padding:16px;}
+  h1{font-size:1.25rem; text-align:center;}
+  .card{background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px; margin-bottom:16px;}
+  label{display:block; font-size:.85rem; color:var(--muted); margin:10px 0 4px;}
+  input, textarea{
+    width:100%; padding:12px; border-radius:8px; border:1px solid var(--border);
+    background:#0b1220; color:var(--text); font-size:1rem; font-family:inherit;
+  }
+  button{width:100%; padding:14px; border:none; border-radius:10px; font-size:1rem; font-weight:600; cursor:pointer; margin-top:14px;}
+  .btn-primary{background:var(--accent); color:#052e12;}
+  .btn-secondary{background:transparent; color:var(--text); border:1px solid var(--border);}
+  a.link{color:var(--accent); text-decoration:none; font-size:.85rem;}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:16px; margin-top:16px;}
+  .qr-item{background:#fff; color:#000; border-radius:10px; padding:12px; text-align:center;}
+  .qr-item p{margin:6px 0 0; font-size:.85rem; font-weight:600;}
+  .qr-item small{color:#555;}
+  @media print {
+    body{background:#fff;}
+    .card:not(#resultsCard), a.link, button, h1, .no-print{display:none !important;}
+    .qr-item{break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Generador de códigos QR</h1>
+
+  <div class="card no-print">
+    <p style="margin-top:0; color:var(--muted); font-size:.9rem;">
+      Generá un QR individual, o pegá una lista (uno por línea, formato <b>Nombre,Empresa</b>) para generar varios de una vez.
+    </p>
+
+    <label>Nombre</label>
+    <input id="nombre" type="text" placeholder="Nombre y apellido">
+    <label>Empresa</label>
+    <input id="empresa" type="text" placeholder="Empresa">
+    <button class="btn-primary" id="genOne">Generar este QR</button>
+
+    <label style="margin-top:20px;">Lista masiva (una persona por línea: Nombre,Empresa)</label>
+    <textarea id="lista" rows="5" placeholder="Juan Pérez,ACME S.A.&#10;Maria Gómez,Transportes del Sur"></textarea>
+    <button class="btn-secondary" id="genMany">Generar lista completa</button>
+  </div>
+
+  <div class="card" id="resultsCard">
+    <div id="results" class="grid"></div>
+    <button class="btn-secondary no-print" id="printBtn" style="margin-top:16px;">Imprimir / Guardar como PDF</button>
+  </div>
+
+  <p style="text-align:center;" class="no-print">
+    <a class="link" href="index.html">← Volver al escáner</a>
+  </p>
+</div>
+
+<script>
+const results = document.getElementById('results');
+
+// Convierte a una cadena de bytes UTF-8 (1 char = 1 byte) antes de codificar,
+// porque esta librería no convierte automáticamente acentos/ñ a UTF-8 y el
+// QR queda ilegible para cualquier lector si no se hace este paso.
+function toUtf8Bytes(str) {
+  return unescape(encodeURIComponent(str));
+}
+
+function renderQr(container, payload) {
+  try {
+    // typeNumber 0 = ajusta automáticamente el tamaño del QR según el largo del texto
+    const qr = qrcode(0, 'L');
+    qr.addData(toUtf8Bytes(payload));
+    qr.make();
+    container.innerHTML = qr.createImgTag(4, 8);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function addQr(nombre, empresa) {
+  if (!nombre.trim()) return;
+  const payload = JSON.stringify({ nombre: nombre.trim(), empresa: empresa.trim() });
+
+  const item = document.createElement('div');
+  item.className = 'qr-item';
+  const qrBox = document.createElement('div');
+  item.appendChild(qrBox);
+  const p = document.createElement('p');
+  p.textContent = nombre.trim();
+  const small = document.createElement('small');
+  small.textContent = empresa.trim();
+  item.appendChild(p);
+  item.appendChild(small);
+  results.appendChild(item);
+
+  const ok = renderQr(qrBox, payload);
+  if (!ok) {
+    qrBox.textContent = 'Error: texto demasiado largo para el QR';
+    qrBox.style.color = 'red';
+  }
+}
+
+document.getElementById('genOne').addEventListener('click', () => {
+  const nombre = document.getElementById('nombre').value;
+  const empresa = document.getElementById('empresa').value;
+  addQr(nombre, empresa);
+});
+
+document.getElementById('genMany').addEventListener('click', () => {
+  const lineas = document.getElementById('lista').value.split('\n');
+  lineas.forEach(linea => {
+    if (!linea.trim()) return;
+    const [nombre, empresa] = linea.split(',');
+    addQr(nombre || '', empresa || '');
+  });
+});
+
+document.getElementById('printBtn').addEventListener('click', () => window.print());
+</script>
+</body>
+</html>
