@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR para los móviles</title>
+<script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js"></script>
+<style>
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:#f4f6f8; color:#111827;}
+  .wrap{max-width:760px; margin:0 auto; padding:16px;}
+  h1{font-size:1.3rem; text-align:center;}
+  .card{background:#fff; border-radius:14px; padding:16px; margin-bottom:16px; box-shadow:0 1px 4px rgba(0,0,0,.15);}
+  label{display:block; font-size:.9rem; color:#4b5563; margin:10px 0 4px;}
+  input, textarea{width:100%; padding:12px; border-radius:8px; border:1px solid #9ca3af; font-size:1rem; font-family:inherit;}
+  button{width:100%; padding:14px; border:none; border-radius:10px; font-size:1rem; font-weight:700; cursor:pointer; margin-top:14px; background:#15803d; color:#fff;}
+  button.sec{background:#fff; color:#111827; border:1px solid #9ca3af;}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(200px,1fr)); gap:16px;}
+  .qr-item{border:2px solid #111827; border-radius:12px; padding:12px; text-align:center; break-inside:avoid; background:#fff;}
+  .qr-item .titulo{font-size:1.3rem; font-weight:800; margin-top:6px;}
+  .qr-item .sub{font-size:.85rem; color:#374151;}
+  small{color:#4b5563;}
+  @media print{
+    body{background:#fff;} .no-print{display:none !important;} .card{box-shadow:none; padding:0;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>QR del Vale Digital</h1>
+
+  <div class="card no-print">
+    <p style="margin-top:0"><small>Cada taxi tiene su propio QR: al escanearlo, el número de móvil ya queda cargado y el cliente solo completa su nombre y su convenio. Imprima e instale uno en cada vehículo.</small></p>
+
+    <label>Dirección de la página del vale</label>
+    <input id="base" type="text">
+
+    <label>Números de móvil (separados por coma o uno por línea)</label>
+    <textarea id="lista" rows="4" placeholder="1, 2, 3, 25, 40"></textarea>
+
+    <button id="gen">Generar QR de los móviles</button>
+    <button class="sec" id="genGeneral">Generar un QR general (sin móvil)</button>
+  </div>
+
+  <div class="card">
+    <div id="results" class="grid"></div>
+    <button class="sec no-print" id="print">Imprimir / Guardar como PDF</button>
+  </div>
+</div>
+
+<script>
+const baseEl = document.getElementById('base');
+baseEl.value = location.href.replace(/[^\/]*(\?.*)?(#.*)?$/, '') + 'vale.html';
+
+function toUtf8Bytes(s) { return unescape(encodeURIComponent(s)); }
+
+function addQr(url, titulo, sub) {
+  const qr = qrcode(0, 'M');
+  qr.addData(toUtf8Bytes(url));
+  qr.make();
+  const item = document.createElement('div');
+  item.className = 'qr-item';
+  item.innerHTML = qr.createImgTag(5, 4);
+  const img = item.querySelector('img');
+  img.style.width = '100%'; img.style.height = 'auto'; img.style.imageRendering = 'pixelated';
+  const t = document.createElement('div'); t.className = 'titulo'; t.textContent = titulo;
+  const s = document.createElement('div'); s.className = 'sub'; s.textContent = sub;
+  item.appendChild(t); item.appendChild(s);
+  document.getElementById('results').appendChild(item);
+}
+
+document.getElementById('gen').addEventListener('click', () => {
+  const base = baseEl.value.trim();
+  document.getElementById('lista').value.split(/[\n,;]+/).map(x => x.trim()).filter(Boolean).forEach(m => {
+    addQr(base + '?movil=' + encodeURIComponent(m), 'Móvil ' + m, 'Escanee para su vale digital');
+  });
+});
+document.getElementById('genGeneral').addEventListener('click', () => {
+  addQr(baseEl.value.trim(), 'Vale Digital', 'Escanee con la cámara de su celular');
+});
+document.getElementById('print').addEventListener('click', () => window.print());
+</script>
+</body>
+</html>

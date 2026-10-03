@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vale Digital</title>
+<style>
+  :root{
+    --bg:#f4f6f8; --card:#ffffff; --text:#111827; --muted:#4b5563;
+    --accent:#15803d; --accent-dark:#166534; --sel:#1d4ed8; --danger:#b91c1c; --border:#9ca3af;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    background:var(--bg); color:var(--text); font-size:20px;}
+  .wrap{max-width:520px; margin:0 auto; padding:16px;}
+  h1{font-size:1.6rem; text-align:center; margin:12px 0 4px;}
+  .sub{text-align:center; color:var(--muted); margin:0 0 16px; font-size:1rem;}
+  .card{background:var(--card); border-radius:16px; padding:18px; box-shadow:0 1px 4px rgba(0,0,0,.15);}
+  .paso{font-weight:700; margin:18px 0 8px; font-size:1.15rem;}
+  .paso:first-child{margin-top:0;}
+  input[type=text], input[type=tel]{
+    width:100%; padding:16px; font-size:1.2rem; border:3px solid var(--border);
+    border-radius:12px; background:#fff; color:var(--text);
+  }
+  input:focus{outline:none; border-color:var(--sel);}
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .conv{
+    padding:18px 8px; font-size:1.15rem; font-weight:700; border:3px solid var(--border);
+    border-radius:12px; background:#fff; color:var(--text); cursor:pointer; min-height:64px;
+  }
+  .conv.sel{background:var(--sel); border-color:var(--sel); color:#fff;}
+  .enviar{
+    width:100%; margin-top:22px; padding:20px; font-size:1.4rem; font-weight:800;
+    border:none; border-radius:14px; background:var(--accent); color:#fff; cursor:pointer;
+  }
+  .enviar:active{background:var(--accent-dark);}
+  .enviar:disabled{opacity:.6;}
+  .err{color:var(--danger); font-weight:700; text-align:center; margin-top:12px; min-height:1.3em;}
+  .movil-fijo{background:#e5e7eb; border-radius:12px; padding:14px; text-align:center; font-weight:800; font-size:1.4rem;}
+  .ok{text-align:center;}
+  .ok .check{font-size:4rem; color:var(--accent);}
+  .ok h2{font-size:1.7rem; margin:8px 0;}
+  .otro{margin-top:18px; background:#fff; color:var(--text); border:3px solid var(--border);
+    padding:16px; width:100%; border-radius:12px; font-size:1.1rem; font-weight:700; cursor:pointer;}
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Vale Digital</h1>
+  <p class="sub">Complete estos datos y toque ENVIAR</p>
+
+  <div class="card" id="formCard">
+    <div class="paso">1. Su nombre y apellido</div>
+    <input id="nombre" type="text" autocomplete="name" placeholder="Ej: Juan Pérez">
+
+    <div class="paso">2. Su convenio</div>
+    <div class="grid" id="convenios"></div>
+    <input id="otroConv" class="hidden" type="text" style="margin-top:10px" placeholder="Escriba el nombre de la empresa">
+
+    <div class="paso" id="movilPaso">3. Número de móvil (taxi)</div>
+    <div id="movilFijo" class="movil-fijo hidden"></div>
+    <input id="movil" type="tel" inputmode="numeric" placeholder="Ej: 25">
+
+    <div class="err" id="err"></div>
+    <button class="enviar" id="enviar">ENVIAR</button>
+  </div>
+
+  <div class="card ok hidden" id="okCard">
+    <div class="check">✔</div>
+    <h2>¡Listo!</h2>
+    <p>Su vale fue registrado correctamente.</p>
+    <button class="otro" id="otro">Registrar otro vale</button>
+  </div>
+</div>
+
+<script>
+// URL de la implementación de Google Apps Script (termina en /exec)
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyd0n8mwJiUxNYxI9adQy3c_pfIk6MPZla7yG84kr4GIQ_-zirAE7cNmG0RrHB4CTg/exec";
+
+// Lista de convenios que aparecen como botones
+const CONVENIOS = ["Coca-Cola", "Komatsu", "Bionet", "Golden Omega", "Coral", "Agro Super", "Otros"];
+
+const nombreEl = document.getElementById('nombre');
+const movilEl = document.getElementById('movil');
+const otroConvEl = document.getElementById('otroConv');
+const errEl = document.getElementById('err');
+const enviarBtn = document.getElementById('enviar');
+const conveniosEl = document.getElementById('convenios');
+
+let convenioSel = "";
+let movilFijo = "";
+
+// Si el QR trae el móvil en el link (?movil=25) ya queda cargado
+try {
+  const m = new URLSearchParams(location.search).get('movil');
+  if (m && m.trim()) movilFijo = m.trim().slice(0, 20);
+} catch (e) {}
+
+if (movilFijo) {
+  const fijo = document.getElementById('movilFijo');
+  fijo.textContent = "Móvil N° " + movilFijo;
+  fijo.classList.remove('hidden');
+  movilEl.classList.add('hidden');
+  document.getElementById('movilPaso').textContent = "3. Móvil (taxi)";
+}
+
+CONVENIOS.forEach(nombre => {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'conv';
+  b.textContent = nombre;
+  b.addEventListener('click', () => {
+    convenioSel = nombre;
+    conveniosEl.querySelectorAll('.conv').forEach(x => x.classList.remove('sel'));
+    b.classList.add('sel');
+    otroConvEl.classList.toggle('hidden', nombre !== "Otros");
+    if (nombre === "Otros") otroConvEl.focus();
+  });
+  conveniosEl.appendChild(b);
+});
+
+function fechaAhora() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' +
+         p(d.getHours()) + ':' + p(d.getMinutes());
+}
+
+function mostrarError(msg) { errEl.textContent = msg; }
+
+enviarBtn.addEventListener('click', async () => {
+  mostrarError('');
+  const nombre = nombreEl.value.trim().replace(/\s+/g, ' ');
+  const movil = movilFijo || movilEl.value.trim();
+  let convenio = convenioSel;
+  if (convenio === "Otros" && otroConvEl.value.trim()) convenio = otroConvEl.value.trim();
+
+  if (nombre.split(' ').length < 2) return mostrarError("Escriba su nombre y apellido.");
+  if (!convenio) return mostrarError("Toque su convenio.");
+  if (convenio === "Otros" && !otroConvEl.value.trim()) return mostrarError("Escriba el nombre de la empresa.");
+  if (!movil) return mostrarError("Escriba el número de móvil.");
+
+  enviarBtn.disabled = true;
+  enviarBtn.textContent = "Enviando...";
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ nombre, convenio, empresa: convenio, movil, fecha: fechaAhora() })
+    });
+    const r = await res.json();
+    if (!r.ok) throw new Error(r.error || "Error desconocido");
+    document.getElementById('formCard').classList.add('hidden');
+    document.getElementById('okCard').classList.remove('hidden');
+  } catch (e) {
+    mostrarError("No se pudo enviar. Revise su internet e intente de nuevo.");
+  } finally {
+    enviarBtn.disabled = false;
+    enviarBtn.textContent = "ENVIAR";
+  }
+});
+
+document.getElementById('otro').addEventListener('click', () => {
+  nombreEl.value = ""; otroConvEl.value = ""; movilEl.value = "";
+  convenioSel = "";
+  conveniosEl.querySelectorAll('.conv').forEach(x => x.classList.remove('sel'));
+  otroConvEl.classList.add('hidden');
+  document.getElementById('okCard').classList.add('hidden');
+  document.getElementById('formCard').classList.remove('hidden');
+  window.scrollTo(0, 0);
+});
+</script>
+</body>
+</html>
